@@ -1,7 +1,6 @@
--- {"id":1298,"ver":"1.0.0","libVer":"1.0.0","author":"ardittristan", "dep":["url>=1.0.0"]}
+-- {"id":1298,"ver":"1.0.0","libVer":"1.0.0","author":"ardittristan"}
 
 local baseURL = "https://www.honeyfeed.fm"
-local qs = Require("url").querystring
 
 local GENRE_FILTER_EXT = {
     "All",
@@ -117,21 +116,13 @@ local ORDER_BY_FILTER_INT = {
     "/ranking/weekly"
 }
 
-local function shrinkURL(url)
-    return url:gsub(".-honeyfeed%.fm", "")
-end
-
-local function expandURL(url)
-    return baseURL .. url
-end
-
 local function getHomePageNovels(subUrl, queryString)
-    local document = GETDocument(expandURL(subUrl .. queryString)):selectFirst(".list-unit-novel"):select(".novel-unit-type-h")
+    local document = GETDocument(baseURL .. subUrl .. queryString):selectFirst(".list-unit-novel"):select(".novel-unit-type-h")
 
     local novels = map(document, function(it)
         return Novel {
             title = it:selectFirst(".novel-name"):text(),
-            link = expandURL(it:selectFirst('.wrap-novel-links a[href^="/novels/"]'):attr("href")),
+            link = baseURL .. it:selectFirst('.wrap-novel-links a[href^="/novels/"]'):attr("href"),
             imageURL = it:selectFirst(".wrap-image-unit-novel img"):attr("src")
         }
     end)
@@ -150,6 +141,8 @@ end
 
 local text = function(v) return v:text() end
 
+local remove = function(v) return v:remove() end
+
 local function trim(input)
     input = string.gsub(input, "^[ \t\n\r]+", "")
     return string.gsub(input, "[ \t\n\r]+$", "")
@@ -163,11 +156,11 @@ local function emptyNil(str)
 end
 
 local function createFilterString(data)
-    return "?"..qs({
-        page = data["page"],
-        genre_id = data["genre"],
-        k = data["search"]
-    })
+    return "?" .. table.concat(mapNotNil({
+        "page=" .. data["page"],
+        not(emptyNil(data["genre"]) == nil) and ("genre_id=" .. data["genre"]) or nil,
+        not(emptyNil(data["search"]) == nil) and ("k=" .. data["search"]) or nil
+    }), "&")
 end
 
 return {
@@ -177,9 +170,6 @@ return {
     imageURL = "https://github.com/shosetsuorg/extensions/raw/dev/icons/WuxiaDotBlog.png",
     chapterType = ChapterType.HTML,
     hasSearch = true,
-
-    shrinkURL = shrinkURL,
-    expandURL = expandURL,
 
     listings = {
         Listing("Latest Updated", true, function(data)
@@ -218,7 +208,7 @@ return {
                 return NovelChapter {
                     order = i,
                     title = trim(it:selectFirst("span.chapter-name"):text()),
-                    link = it:attr("href"),
+                    link = baseURL ..it:attr("href"),
                     release = it:selectFirst("span.date-chapter-create-update"):text()
                 }
             end))
@@ -232,7 +222,7 @@ return {
         local htmlElement = GETDocument(chapterURL):selectFirst("#chapter-body > .wrap-body > div")
 
         -- Remove/modify unwanted HTML elements to get a clean webpage.
-        htmlElement:select("span[data-category=button]"):remove()
+        map(htmlElement:select("span[data-category=button]"), remove)
 
         return pageOfElem(htmlElement)
     end,
