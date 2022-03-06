@@ -1,6 +1,7 @@
--- {"id":1298,"ver":"1.0.0","libVer":"1.0.0","author":"ardittristan"}
+-- {"id":1298,"ver":"1.0.0","libVer":"1.0.0","author":"ardittristan", "dep":["url>=1.0.0"]}
 
 local baseURL = "https://www.honeyfeed.fm"
+local qs = Require("url").querystring
 
 local GENRE_FILTER_EXT = {
     "All",
@@ -156,11 +157,11 @@ local function emptyNil(str)
 end
 
 local function createFilterString(data)
-    return "?" .. table.concat(mapNotNil({
-        "page=" .. data["page"],
-        not(emptyNil(data["genre"]) == nil) and ("genre_id=" .. data["genre"]) or nil,
-        not(emptyNil(data["search"]) == nil) and ("k=" .. data["search"]) or nil
-    }), "&")
+    return "?"..qs({
+        page = data["page"],
+        genre_id = data["genre"],
+        k = data["search"]
+    })
 end
 
 return {
