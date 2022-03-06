@@ -3,120 +3,6 @@
 local baseURL = "https://www.honeyfeed.fm"
 local qs = Require("url").querystring
 
-local GENRE_FILTER_EXT = {
-    "All",
-    "Action",
-    "Adventure",
-    "Boys Love",
-    "Collaboration",
-    "Comedy",
-    "Crime",
-    "Culinary",
-    "Drama",
-    "Ecchi",
-    "Fantasy",
-    "Game",
-    "Girls Love",
-    "Gun Action",
-    "Harem",
-    "Historical",
-    "Horror",
-    "Isekai",
-    "Magic",
-    "Martial Arts",
-    "Mecha",
-    "Military / War",
-    "Music",
-    "Mystery",
-    "Other",
-    "Philosophical",
-    "Post-Apocalyptic",
-    "Psychological",
-    "Romance",
-    "School",
-    "Sci-Fi",
-    "Seasonal",
-    "Seinen",
-    "Short Story",
-    "Shoujo",
-    "Shounen",
-    "Slice of Life",
-    "Space",
-    "Sports",
-    "Supernatural",
-    "Survival",
-    "Thriller",
-    "Tragedy",
-    "Vampire",
-    "Yaoi",
-    "Yuri",
-    "Zombie",
-    "Adult"
-}
-local GENRE_FILTER_KEY = 500
-local GENRE_FILTER_INT = {
-    [0] = nil,
-    "1",  -- Action
-    "2",  -- Adventure
-    "49", -- Boys Love
-    "62", -- Collaboration
-    "5",  -- Comedy
-    "14", -- Crime
-    "6",  -- Culinary
-    "9",  -- Drama
-    "10", -- Ecchi
-    "11", -- Fantasy
-    "13", -- Game
-    "47", -- Girls Love
-    "16", -- Gun Action
-    "17", -- Harem
-    "19", -- Historical
-    "20", -- Horror
-    "63", -- Isekai
-    "26", -- Magic
-    "28", -- Martial Arts
-    "29", -- Mecha
-    "30", -- Military / War
-    "32", -- Music
-    "33", -- Mystery
-    "39", -- Other
-    "36", -- Philosophical
-    "66", -- Post-Apocalyptic
-    "38", -- Psychological
-    "40", -- Romance
-    "42", -- School
-    "43", -- Sci-Fi
-    "61", -- Seasonal
-    "44", -- Seinen
-    "64", -- Short Story
-    "46", -- Shoujo
-    "48", -- Shounen
-    "50", -- Slice of Life
-    "51", -- Space
-    "52", -- Sports
-    "53", -- Supernatural
-    "45", -- Survival
-    "55", -- Thriller
-    "65", -- Tragedy
-    "56", -- Vampire
-    "58", -- Yaoi
-    "59", -- Yuri
-    "60", -- Zombie
-    "-1", -- Adult
-}
-
-local ORDER_BY_FILTER_EXT = {
-    "New Novels",
-    "Monthly Ranking",
-    "Weekly Ranking"
-}
-local ORDER_BY_FILTER_KEY = 700
-local ORDER_BY_FILTER_INT = {
-    [0] = "/novels",
-    "/ranking/monthly",
-    "/ranking/weekly"
-}
-
 local function getHomePageNovels(subUrl, queryString)
     local document = GETDocument(baseURL .. subUrl .. queryString):selectFirst(".list-unit-novel"):select(".novel-unit-type-h")
 
@@ -159,7 +45,6 @@ end
 local function createFilterString(data)
     return "?"..qs({
         page = data["page"],
-        genre_id = data["genre"],
         k = data["search"]
     })
 end
@@ -181,6 +66,15 @@ return {
         end),
         Listing("Monthly Ranking", true, function(data)
             return getHomePageNovels("/ranking/monthly", createFilterString({page = data[PAGE] + 1}))
+        end),
+        Listing("Adult Latest Updated", true, function(data)
+            return getHomePageNovels("/adult/novels", createFilterString({page = data[PAGE] + 1}))
+        end),
+        Listing("Adult Weekly Ranking", true, function(data)
+            return getHomePageNovels("/adult/ranking/weekly", createFilterString({page = data[PAGE] + 1}))
+        end),
+        Listing("Adult Monthly Ranking", true, function(data)
+            return getHomePageNovels("/adult/ranking/monthly", createFilterString({page = data[PAGE] + 1}))
         end)
     },
 
@@ -190,7 +84,7 @@ return {
 
         local novel = NovelInfo {
             title = novelWrap:selectFirst("h1.text-center"):text(),
-            description = table.concat(map(novelWrap:select(".wrap-novel-body > div > *"), text), "\n"),
+            description = table.concat(map(novelWrap:selectFirst("#wrap-synopsis"):select(".wrap-novel-body > div > *"), text), "\n"),
             genres = map(novelWrap:selectFirst("#wrap-novel-info"):select('td > a[href^="/novels?genre_id"] .label'), text),
             status = getStatus(novelWrap:selectFirst("#wrap-novel-info > table > tbody > tr:nth-child(5) > td:nth-child(2)"):text()),
             authors = map(novelWrap:select("#wrap-novel-info > table > tbody > tr:nth-child(1) > td:nth-child(2) > div > div > div:nth-child(1) > span > a"), text)
@@ -230,24 +124,9 @@ return {
 
     isSearchIncrementing = true,
     search = function(data)
-        local page = data[PAGE] + 1
-
-        local search = emptyNil(data[QUERY])
-        local genre = GENRE_FILTER_INT[data[GENRE_FILTER_KEY]]
-
-        if genre == nil and not(search == nil) then
-            return getHomePageNovels("/search/novel_title", createFilterString({page = page, search = search}))
-        end
-
-        if genre == "-1" then
-            return getHomePageNovels("/adult" .. ORDER_BY_FILTER_INT[data[ORDER_BY_FILTER_KEY]], createFilterString({page = page}))
-        end
-
-        return getHomePageNovels(ORDER_BY_FILTER_INT[data[ORDER_BY_FILTER_KEY]], createFilterString({page = page, genre = genre}))
+        return getHomePageNovels("/search/novel_title", createFilterString({page = data[PAGE] + 1, search = emptyNil(data[QUERY])}))
     end,
 
-    searchFilters = {
-        DropdownFilter(GENRE_FILTER_KEY, "Genre (disables search)", GENRE_FILTER_EXT),
-        DropdownFilter(ORDER_BY_FILTER_KEY, "Order by", ORDER_BY_FILTER_EXT)
-    }
+    shrinkURL = function(url) return url end,
+    expandURL = function(url) return url end
 }
