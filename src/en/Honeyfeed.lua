@@ -117,13 +117,21 @@ local ORDER_BY_FILTER_INT = {
     "/ranking/weekly"
 }
 
+local function shrinkURL(url)
+    return url:gsub(".-honeyfeed%.fm", "")
+end
+
+local function expandURL(url)
+    return baseURL .. url
+end
+
 local function getHomePageNovels(subUrl, queryString)
-    local document = GETDocument(baseURL .. subUrl .. queryString):selectFirst(".list-unit-novel"):select(".novel-unit-type-h")
+    local document = GETDocument(expandURL(subUrl .. queryString)):selectFirst(".list-unit-novel"):select(".novel-unit-type-h")
 
     local novels = map(document, function(it)
         return Novel {
             title = it:selectFirst(".novel-name"):text(),
-            link = baseURL .. it:selectFirst('.wrap-novel-links a[href^="/novels/"]'):attr("href"),
+            link = expandURL(it:selectFirst('.wrap-novel-links a[href^="/novels/"]'):attr("href")),
             imageURL = it:selectFirst(".wrap-image-unit-novel img"):attr("src")
         }
     end)
@@ -170,16 +178,18 @@ return {
     chapterType = ChapterType.HTML,
     hasSearch = true,
 
+    shrinkURL = shrinkURL,
+    expandURL = expandURL,
 
     listings = {
         Listing("Latest Updated", true, function(data)
-            return getHomePageNovels("/novels", createFilterString({page = data[PAGE]}))
+            return getHomePageNovels("/novels", createFilterString({page = data[PAGE] + 1}))
         end),
         Listing("Weekly Ranking", true, function(data)
-            return getHomePageNovels("/ranking/weekly", {page = data[PAGE]})
+            return getHomePageNovels("/ranking/weekly", createFilterString({page = data[PAGE] + 1}))
         end),
         Listing("Monthly Ranking", true, function(data)
-            return getHomePageNovels("/ranking/monthly", {page = data[PAGE]})
+            return getHomePageNovels("/ranking/monthly", createFilterString({page = data[PAGE] + 1}))
         end)
     },
 
@@ -189,12 +199,15 @@ return {
 
         local novel = NovelInfo {
             title = novelWrap:selectFirst("h1.text-center"):text(),
-            imageURL = novelWrap:selectFirst(".wrap-img-novel-mask > img"):attr("src"),
             description = table.concat(map(novelWrap:select(".wrap-novel-body > div > *"), text), "\n"),
             genres = map(novelWrap:selectFirst("#wrap-novel-info"):select('td > a[href^="/novels?genre_id"] .label'), text),
             status = getStatus(novelWrap:selectFirst("#wrap-novel-info > table > tbody > tr:nth-child(5) > td:nth-child(2)"):text()),
             authors = map(novelWrap:select("#wrap-novel-info > table > tbody > tr:nth-child(1) > td:nth-child(2) > div > div > div:nth-child(1) > span > a"), text)
         }
+
+        pcall(function()
+            novel:setImageURL(novelWrap:selectFirst(".wrap-img-novel-mask > img"):attr("src"))
+        end)
 
         if loadChapters then
             local chapterWrap = novelWrap:selectFirst("#wrap-chapter")
@@ -205,7 +218,7 @@ return {
                 return NovelChapter {
                     order = i,
                     title = trim(it:selectFirst("span.chapter-name"):text()),
-                    link = baseURL .. it:attr("href"),
+                    link = it:attr("href"),
                     release = it:selectFirst("span.date-chapter-create-update"):text()
                 }
             end))
@@ -219,27 +232,27 @@ return {
         local htmlElement = GETDocument(chapterURL):selectFirst("#chapter-body > .wrap-body > div")
 
         -- Remove/modify unwanted HTML elements to get a clean webpage.
-        htmlElement:select("span[data-category=button]")
+        htmlElement:select("span[data-category=button]"):remove()
 
         return pageOfElem(htmlElement)
     end,
 
     isSearchIncrementing = true,
     search = function(data)
-        local page = data[PAGE]
+        local page = data[PAGE] + 1
 
         local search = emptyNil(data[QUERY])
         local genre = GENRE_FILTER_INT[data[GENRE_FILTER_KEY]]
 
         if genre == nil and not(search == nil) then
-            return getHomePageNovels("/search/novel_title", {page = page, search = search})
+            return getHomePageNovels("/search/novel_title", createFilterString({page = page, search = search}))
         end
 
         if genre == "-1" then
-            return getHomePageNovels("/adult" .. ORDER_BY_FILTER_INT[data[ORDER_BY_FILTER_KEY]], {page = page})
+            return getHomePageNovels("/adult" .. ORDER_BY_FILTER_INT[data[ORDER_BY_FILTER_KEY]], createFilterString({page = page}))
         end
 
-        return getHomePageNovels(ORDER_BY_FILTER_INT[data[ORDER_BY_FILTER_KEY]], {page = page, genre = genre})
+        return getHomePageNovels(ORDER_BY_FILTER_INT[data[ORDER_BY_FILTER_KEY]], createFilterString({page = page, genre = genre}))
     end,
 
     searchFilters = {
